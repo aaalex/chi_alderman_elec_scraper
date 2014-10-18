@@ -48,54 +48,53 @@ class Scraper
     return form
   end
 
+  def get_office(doc)
+	office = doc.css('body > table:nth-child(1) > tr:nth-child(1) > td > p > font > b').first.text
+	office = office.sub! " -- ", ""
+	return office
+  end
 
-def get_office(doc)
-  office = doc.css('body > table:nth-child(1) > tr:nth-child(1) > td > p > font > b').first.text
-  office = office.sub! " -- ", ""
-return office
-end
+  def get_ward(doc)
+    ward = doc.css('body > table:nth-child(1) > tr:nth-child(4) > td:nth-child(1) > p > font > b > a').text
+    return ward
+  end
 
-def get_ward(doc)
-  ward = doc.css('body > table:nth-child(1) > tr:nth-child(4) > td:nth-child(1) > p > font > b > a').text
-  return ward
-end
-
-def get_candidate(doc)
-  has_candidates = true
-  n = 3
-  candidate_array = []
-  while has_candidates  do
-    candidate = doc.css("body > table:nth-child(1) > tr:nth-child(3) > td:nth-child(#{n}) > b > font > p").text
+  def get_candidate(doc)
+    has_candidates = true
+    n = 3
+    candidate_array = []
+    while has_candidates  do
+      candidate = doc.css("body > table:nth-child(1) > tr:nth-child(3) > td:nth-child(#{n}) > b > font > p").text
       candidate = candidate.strip
       if candidate != ""
-        candidate_array.push(candidate)
-     else
-        has_candidates = false
+          candidate_array.push(candidate)
+      else
+          has_candidates = false
       end
       n = n + 2
     end
-  return candidate_array
-end
+    
+    return candidate_array
+  end
 
-
-def get_votes(doc)
-  has_votes = true
-  n = 3
-  votes_array = []
-  while has_votes  do
-  votes = doc.css("body > table:nth-child(1) > tr:nth-child(4) > td:nth-child(#{n}) > p > font > b").text
-  votes = votes.strip
+  def get_votes(doc)
+    has_votes = true
+    n = 3
+    votes_array = []
+    while has_votes  do
+      votes = doc.css("body > table:nth-child(1) > tr:nth-child(4) > td:nth-child(#{n}) > p > font > b").text
+      votes = votes.strip
       if votes != ""
         votes_array.push(votes)
-     else
+      else
         has_votes = false
       end
       n = n + 2
     end
-  return votes_array
-end
+    return votes_array
+  end
 
-def parse_ald_results_html(html)
+  def parse_ald_results_html(html)
     doc = Nokogiri::HTML(html)
     results = Array.new
     office = get_office(doc)
@@ -116,7 +115,6 @@ def parse_ald_results_html(html)
     return results
   end
 end
-
 
 if __FILE__ == $0
   s = Scraper.new()
