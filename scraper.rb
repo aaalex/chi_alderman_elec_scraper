@@ -1,5 +1,6 @@
  #!/usr/bin/env ruby
 
+require 'csv'
 require 'mechanize'
 require 'nokogiri'
 
@@ -15,7 +16,7 @@ class Scraper
   end
 
   def get_ald_race_name(ward_num)
-  	l = ward_num.to_s
+    l = ward_num.to_s
     last = l[-1,1]
     first = l[0]
 
@@ -34,7 +35,6 @@ class Scraper
     return "Alderman #{ward_num}#{suffix} Ward"
   end
 
-
   def get_ald_results_html(race_name)
     agent = Mechanize.new
     params = get_ald_post_params(race_name)
@@ -42,16 +42,15 @@ class Scraper
     return page.body
   end
 
-
   def get_ald_post_params(race_name)
     form = { "VTI-GROUP" => 0, :D3 => race_name, :flag => 1, :B1 => "View The Results"}
     return form
   end
 
   def get_office(doc)
-	office = doc.css('body > table:nth-child(1) > tr:nth-child(1) > td > p > font > b').first.text
-	office = office.sub! " -- ", ""
-	return office
+    office = doc.css('body > table:nth-child(1) > tr:nth-child(1) > td > p > font > b').first.text
+    office = office.sub! " -- ", ""
+    return office
   end
 
   def get_ward(doc)
@@ -59,7 +58,7 @@ class Scraper
     return ward
   end
 
-  def get_candidate(doc)
+  def get_candidates(doc)
     has_candidates = true
     n = 3
     candidate_array = []
@@ -99,9 +98,18 @@ class Scraper
     results = Array.new
     office = get_office(doc)
     ward = get_ward(doc)
-    candidate = get_candidate(doc)
+    candidates = get_candidates(doc)
     votes = get_votes(doc)
-    results = [:office => office, :ward => ward, :candidate => candidate, :votes => votes]
+    candidates.zip(votes).each do |candidate, candidate_votes|
+      result = {
+        :office => office,
+        :ward => ward,
+        :candidate => candidate,
+        :votes => candidate_votes.to_i,
+      }
+      results.push(result)
+    end
+
     return results
   end
 
@@ -118,6 +126,14 @@ end
 
 if __FILE__ == $0
   s = Scraper.new()
-  #s.run
-  puts s.get_results
+  results = s.get_results
+  column_names = results.first.keys
+  csv_s = CSV.generate do |csv|
+    csv << column_names
+    results.each do |result|
+      csv << result.values
+    end
+  end
+
+  puts csv_s
 end

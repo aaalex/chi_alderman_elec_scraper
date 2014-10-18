@@ -43,12 +43,12 @@ class TestScraper < MiniTest::Unit::TestCase
     assert_equal("30", ward)
   end
 
-  def test_get_candidate()
+  def test_get_candidates()
     scraper = Scraper.new
     test_html_file_path = File.expand_path("../../test_data/2011__alderman_30th_ward.html", __FILE__)
     html = File.read(test_html_file_path)
     doc = Nokogiri::HTML(html)
-    candidate = scraper.get_candidate(doc)
+    candidate = scraper.get_candidates(doc)
     assert_equal(["STELLA NICPON", "ARIEL E. REBOYRAS", "DOUG CANNON", "CHESTER R. HORNOWSKI"], candidate)
   end
 
@@ -67,9 +67,12 @@ class TestScraper < MiniTest::Unit::TestCase
     html = File.read(test_html_file_path)
     results = scraper.parse_ald_results_html(html)
     result = results[0]
+    puts result[:office]
     assert_equal(result[:office], "Alderman 30th Ward")
     assert_equal(result[:ward], "30")
-    assert_equal(result[:candidate], ["STELLA NICPON", "ARIEL E. REBOYRAS", "DOUG CANNON", "CHESTER R. HORNOWSKI"])
-    assert_equal(result[:votes], ["617", "4697", "378", "559"])
+    assert_equal(result[:candidate], "STELLA NICPON")
+    assert_equal(result[:votes], 617)
+    #assert_equal(result[:candidate], ["STELLA NICPON", "ARIEL E. REBOYRAS", "DOUG CANNON", "CHESTER R. HORNOWSKI"])
+    #assert_equal(result[:votes], ["617", "4697", "378", "559"])
   end
 end
