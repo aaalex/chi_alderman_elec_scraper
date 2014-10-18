@@ -1,5 +1,6 @@
  #!/usr/bin/env ruby
 
+require 'csv'
 require 'mechanize'
 require 'nokogiri'
 
@@ -8,28 +9,24 @@ class Scraper
 
   def get_ald_races
     r = Array.new
-    for i in 1..50      
+    for i in 1..50
       r.push(self.get_ald_race_name(i))
     end
     return r
   end
 
-  # Alex, I "refactored" (see http://en.wikipedia.org/wiki/Code_refactoring if 
-  # you're not familiar with the term) the logic you wrote today into its own
-  # method to make it easier to test.  I didn't change any of the logic, I just
-  # made it it's own unit.  Look how simple the get_ald_races() method is now!
   def get_ald_race_name(ward_num)
-  	l = ward_num.to_s
+    l = ward_num.to_s
     last = l[-1,1]
     first = l[0]
 
     if l == "1"
       suffix = "st"
-    elsif last == "1" and first != "1"
+    elsif last == "1" && first != "1"
       suffix = "st"
-    elsif last == "2" and first != "1"
+    elsif last == "2" && first != "1"
       suffix = "nd"
-    elsif last == "3" and first != "1"
+    elsif last == "3" && first != "1"
       suffix = "rd"
     else
       suffix = "th"
@@ -38,73 +35,105 @@ class Scraper
     return "Alderman #{ward_num}#{suffix} Ward"
   end
 
-  # Return a string containing the result HTML for a particular race
-  #
-  # ==== Arguments
-  #
-  # * +race+ - String representing an aldermanic race.  For example "Alderman 1st Ward"
-  #
-  # ==== Returns
-  #
-  # A string containing the HTML from the results website for the race
-  def get_ald_results_html(race)
+  def get_ald_results_html(race_name)
     agent = Mechanize.new
-    # Get the map of POST parameters needed to get the results page
-    params = self.get_ald_post_params(race)
-    # Use Mechanize to request the results page
-    page = agent.post(params)
-    # Return the body of the page.  This will be the HTML representing the
-    # results page.  We'll have to parse this in another method.
+    params = get_ald_post_params(race_name)
+    page = agent.post(@@municipal_general_election_2011_url, params)
     return page.body
   end
 
-  # Get the post parameters needed to retrieve a race's results 
-  #
-  # ==== Arguments
-  # 
-  # * +race+ - String representing an aldermanic race.  For example "Alderman 1st Ward"
-  #
-  # ==== Returns
-  # 
-  # A hash with keys and values representing the POST parameters
-  def get_ald_post_params(race)
-    # TODO: Return a hash that contains the following keys/values
-    # This is a good place to start
-    # * VTI-GROUP:0
-    # * D3:Alderman 1st Ward (the value of the race argument)
-    # * flag:1
-    # *B1:  View The Results   
-    return {}
+  def get_ald_post_params(race_name)
+    form = { "VTI-GROUP" => 0, :D3 => race_name, :flag => 1, :B1 => "View The Results"}
+    return form
   end
 
-  # Parse the results HTML
-  #
-  # ==== Arguments
-  # 
-  # * +html+ - String containing HTML of the results page
-  #
-  # ==== Returns
-  #
-  # An array of hashes where each hash looks something like this
-  # {
-  #   office: "Alderman 1st Ward",
-  #   candidate: 'PROCO ''JOE'' MORENO',
-  #   ward:'1',
-  #   votes: 7243,
-  #   percentage: 73.56,
-  # }
+  def get_office(doc)
+    office = doc.css('body > table:nth-child(1) > tr:nth-child(1) > td > p > font > b').first.text
+    office = office.sub! " -- ", ""
+    return office
+  end
+
+  def get_ward(doc)
+    ward = doc.css('body > table:nth-child(1) > tr:nth-child(4) > td:nth-child(1) > p > font > b > a').text
+    return ward
+  end
+
+  def get_candidates(doc)
+    has_candidates = true
+    n = 3
+    candidate_array = []
+    while has_candidates  do
+      candidate = doc.css("body > table:nth-child(1) > tr:nth-child(3) > td:nth-child(#{n}) > b > font > p").text
+      candidate = candidate.strip
+      if candidate != ""
+          candidate_array.push(candidate)
+      else
+          has_candidates = false
+      end
+      n = n + 2
+    end
+    
+    return candidate_array
+  end
+
+  def get_votes(doc)
+    has_votes = true
+    n = 3
+    votes_array = []
+    while has_votes  do
+      votes = doc.css("body > table:nth-child(1) > tr:nth-child(4) > td:nth-child(#{n}) > p > font > b").text
+      votes = votes.strip
+      if votes != ""
+        votes_array.push(votes)
+      else
+        has_votes = false
+      end
+      n = n + 2
+    end
+    return votes_array
+  end
+
   def parse_ald_results_html(html)
     doc = Nokogiri::HTML(html)
     results = Array.new
-    # TODO: Use Nokogiri to parse the HTML
-    # It's probably easies to use CSS selectors to get the values you want
-    # See http://nokogiri.org/Nokogiri/XML/Node.html#method-i-css
+    office = get_office(doc)
+    ward = get_ward(doc)
+    candidates = get_candidates(doc)
+    votes = get_votes(doc)
+    candidates.zip(votes).each do |candidate, candidate_votes|
+      result = {
+        :office => office,
+        :ward => ward,
+        :candidate => candidate,
+        :votes => candidate_votes.to_i,
+      }
+      results.push(result)
+    end
+
+    return results
+  end
+
+  def get_results
+    results = []
+    get_ald_races.each do |race_name|
+       html = get_ald_results_html(race_name)
+       html_parsed = parse_ald_results_html(html)
+       results += html_parsed
+    end
     return results
   end
 end
 
 if __FILE__ == $0
   s = Scraper.new()
-  #s.run
-  puts s.get_ald_races
+  results = s.get_results
+  column_names = results.first.keys
+  csv_s = CSV.generate do |csv|
+    csv << column_names
+    results.each do |result|
+      csv << result.values
+    end
+  end
+
+  puts csv_s
 end
